@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SibiTalk — Bahasa Isyarat Digital</title>
+
+<!-- ✅ MediaPipe Hands CDN (ASLI dari Google) -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0f1e; --surface: #111827; --surface2: #1a2438;
+    --accent: #00e5ff; --accent2: #7c3aed; --accent3: #f59e0b;
+    --text: #e8f4f8; --muted: #8fa3b1;
+    --green: #10b981; --red: #ef4444;
+    --card-border: rgba(0,229,255,0.12);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; min-height:100vh; overflow-x:hidden; }
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background: radial-gradient(ellipse 60% 50% at 20% 10%,rgba(124,58,237,0.12) 0%,transparent 70%),
+                radial-gradient(ellipse 50% 40% at 80% 80%,rgba(0,229,255,0.08) 0%,transparent 70%);
+  }
+
+  nav {
+    position:sticky; top:0; z-index:100;
+    background:rgba(10,15,30,0.88); backdrop-filter:blur(16px);
+    border-bottom:1px solid var(--card-border);
+    padding:14px 24px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+  }
+  .logo { font-family:'Syne',sans-serif; font-size:1.4rem; font-weight:800; color:var(--accent); }
+  .logo span { color:var(--accent2); }
+  .nav-chips { display:flex; gap:8px; flex-wrap:wrap; }
+  .nav-chip {
+    padding:6px 14px; border-radius:20px; border:1px solid var(--card-border);
+    background:var(--surface); color:var(--muted); font-size:0.82rem; cursor:pointer; transition:all 0.2s;
+  }
+  .nav-chip:hover,.nav-chip.active { border-color:var(--accent); color:var(--accent); background:rgba(0,229,255,0.06); }
+
+  .page { display:none; animation:fadeUp 0.4s ease; }
+  .page.active { display:block; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)} }
+
+  /* HERO */
+  .hero { position:relative;z-index:1; max-width:900px;margin:0 auto; padding:70px 24px 40px; text-align:center; }
+  .hero-badge { display:inline-block; padding:6px 16px; background:rgba(0,229,255,0.08); border:1px solid rgba(0,229,255,0.25); border-radius:20px; font-size:0.78rem; color:var(--accent); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:24px; }
+  .hero h1 { font-family:'Syne',sans-serif; font-size:clamp(2.2rem,5vw,3.8rem); font-weight:800; line-height:1.1; margin-bottom:20px; }
+  .hero h1 em { font-style:normal; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .hero p { color:var(--muted); font-size:1rem; max-width:540px; margin:0 auto 36px; line-height:1.7; }
+  .hero-actions { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+  .btn-primary { padding:13px 26px; background:linear-gradient(135deg,var(--accent),#0099cc); color:#000; font-weight:700; border-radius:12px; border:none; cursor:pointer; font-size:0.92rem; transition:transform 0.2s,box-shadow 0.2s; font-family:'DM Sans',sans-serif; }
+  .btn-primary:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,229,255,0.3); }
+  .btn-ghost { padding:13px 26px; background:transparent; border:1.5px solid var(--card-border); color:var(--text); border-radius:12px; cursor:pointer; font-size:0.92rem; transition:all 0.2s; font-family:'DM Sans',sans-serif; }
+  .btn-ghost:hover { border-color:var(--accent); color:var(--accent); }
+
+  .section { position:relative;z-index:1; padding:40px 24px; max-width:1000px; margin:0 auto; }
+  .section-title { font-family:'Syne',sans-serif; font-size:1.6rem; font-weight:700; margin-bottom:24px; }
+  .cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:16px; }
+  .card { background:var(--surface); border:1px solid var(--card-border); border-radius:16px; padding:24px; transition:transform 0.2s,border-color 0.2s; cursor:pointer; }
+  .card:hover { transform:translateY(-4px); border-color:var(--accent); }
+  .card-icon { width:48px;height:48px; background:rgba(0,229,255,0.1); border-radius:12px; display:flex;align-items:center;justify-content:center; font-size:1.6rem; margin-bottom:16px; }
+  .card h3 { font-family:'Syne',sans-serif; font-size:1rem; margin-bottom:8px; }
+  .card p { color:var(--muted); font-size:0.85rem; line-height:1.6; }
+
+  /* SCAN PAGE */
+  .scan-container { max-width:920px;margin:0 auto;padding:32px 24px;display:grid;grid-template-columns:1fr 1fr;gap:24px;position:relative;z-index:1; }
+  @media(max-width:700px){.scan-container{grid-template-columns:1fr;}}
+
+  .cam-box { background:var(--surface); border:1.5px solid var(--card-border); border-radius:20px; overflow:hidden; }
+  .cam-header { padding:12px 18px; border-bottom:1px solid var(--card-border); display:flex; align-items:center; gap:10px; }
+  .cam-dot{width:8px;height:8px;border-radius:50%;}
+  .cam-dot.red{background:var(--red);}
+  .cam-dot.yellow{background:var(--accent3);}
+  .cam-dot.green{background:var(--green);}
+  .cam-title{font-family:'Syne',sans-serif;font-size:0.9rem;font-weight:700;}
+
+  .video-wrap { position:relative; width:100%; background:#000; min-height:260px; overflow:hidden; }
+  #videoEl { width:100%; display:block; object-fit:cover; transform:scaleX(-1); }
+  #handCanvas { position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;transform:scaleX(-1); }
+
+  .scan-overlay { position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;background:rgba(0,0,0,0.72);backdrop-filter:blur(4px);z-index:5; }
+  .scan-overlay.hidden{display:none;}
+  .scan-overlay p{color:var(--muted);font-size:0.88rem;text-align:center;padding:0 16px;}
+
+  .mp-loading{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;background:rgba(10,15,30,0.9);z-index:6;}
+  .mp-loading.show{display:flex;}
+  .spinner{width:40px;height:40px;border-radius:50%;border:3px solid rgba(0,229,255,0.15);border-top-color:var(--accent);animation:spin 0.8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .mp-loading p{color:var(--muted);font-size:0.85rem;}
+
+  .scan-line{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:scanMove 2.2s ease-in-out infinite;display:none;z-index:4;}
+  .scan-line.active{display:block;}
+  @keyframes scanMove{0%{top:8%}50%{top:88%}100%{top:8%}}
+
+  .no-hand-notice{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);padding:5px 12px;background:rgba(0,0,0,0.6);border-radius:12px;font-size:0.75rem;color:var(--muted);white-space:nowrap;z-index:4;display:none;}
+  .no-hand-notice.show{display:block;}
+
+  .conf-bar-wrap{padding:8px 18px 10px;}
+  .conf-label{font-size:0.75rem;color:var(--muted);margin-bottom:5px;display:flex;justify-content:space-between;}
+  .conf-bar{height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;}
+  .conf-fill{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:3px;transition:width 0.35s;width:0%;}
+
+  .cam-controls{padding:12px 18px;display:flex;gap:10px;flex-wrap:wrap;}
+  .btn-scan{flex:1;padding:10px 16px;background:linear-gradient(135deg,var(--accent),#0099cc);color:#000;font-weight:700;border:none;border-radius:10px;cursor:pointer;font-size:0.88rem;font-family:'DM Sans',sans-serif;transition:opacity 0.2s;}
+  .btn-scan:disabled{opacity:0.4;cursor:not-allowed;}
+  .btn-stop{padding:10px 16px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.35);color:var(--red);border-radius:10px;cursor:pointer;font-size:0.88rem;font-family:'DM Sans',sans-serif;}
+  .btn-stop:hover{background:rgba(239,68,68,0.25);}
+
+  /* RESULT */
+  .result-panel{background:var(--surface);border:1.5px solid var(--card-border);border-radius:20px;display:flex;flex-direction:column;}
+  .result-header{padding:14px 18px;border-bottom:1px solid var(--card-border);font-family:'Syne',sans-serif;font-weight:700;display:flex;align-items:center;justify-content:space-between;}
+  .live-badge{padding:3px 10px;border-radius:12px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);color:var(--green);font-size:0.72rem;display:none;align-items:center;gap:5px;}
+  .live-badge.show{display:inline-flex;}
+  .live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse-dot 1s infinite;}
+  @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:0.3}}
+
+  .gesture-display{flex:1;padding:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:190px;}
+  .gesture-emoji{font-size:4.5rem;animation:pop 0.3s ease;line-height:1;}
+  @keyframes pop{from{transform:scale(0.4);opacity:0}to{transform:scale(1);opacity:1}}
+  .gesture-label{font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:var(--accent);text-align:center;}
+  .gesture-sub{color:var(--muted);font-size:0.8rem;text-align:center;max-width:220px;line-height:1.5;}
+  .gesture-meaning{padding:8px 14px;background:rgba(0,229,255,0.06);border:1px solid rgba(0,229,255,0.14);border-radius:10px;color:var(--text);font-size:0.86rem;text-align:center;max-width:220px;}
+
+  /* Finger indicator bars */
+  .finger-wrap{display:flex;gap:4px;align-items:flex-end;padding:6px 0;}
+  .f-col{display:flex;flex-direction:column;align-items:center;gap:3px;}
+  .f-bar{width:16px;border-radius:3px 3px 0 0;background:rgba(0,229,255,0.15);transition:all 0.25s;}
+  .f-bar.up{background:var(--accent);}
+  .f-name{font-size:0.62rem;color:var(--muted);}
+
+  .voice-btn{margin:0 18px 14px;padding:12px;background:linear-gradient(135deg,var(--accent2),#5b21b6);border:none;border-radius:12px;color:#fff;font-weight:700;cursor:pointer;font-size:0.88rem;display:flex;align-items:center;justify-content:center;gap:8px;transition:transform 0.2s;font-family:'DM Sans',sans-serif;}
+  .voice-btn:hover{transform:scale(1.02);}
+  .history-list{padding:0 18px 14px;max-height:140px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;}
+  .history-item{display:flex;align-items:center;gap:10px;padding:7px 12px;background:var(--surface2);border-radius:8px;font-size:0.82rem;}
+  .h-label{color:var(--text);font-weight:500;}
+  .h-time{color:var(--muted);margin-left:auto;font-size:0.72rem;}
+
+  /* PERKENALAN */
+  .intro-page{max-width:820px;margin:0 auto;padding:40px 24px;position:relative;z-index:1;}
+  .intro-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px;}
+  @media(max-width:580px){.intro-grid{grid-template-columns:1fr;}}
+  .intro-card{background:var(--surface);border:1px solid var(--card-border);border-radius:16px;padding:18px;cursor:pointer;transition:all 0.2s;text-align:center;}
+  .intro-card:hover{border-color:var(--accent2);transform:translateY(-3px);}
+  .intro-sign{font-size:3rem;margin-bottom:10px;display:block;}
+  .intro-card h3{font-family:'Syne',sans-serif;font-size:0.95rem;margin-bottom:3px;}
+  .intro-card p{color:var(--muted);font-size:0.78rem;}
+  .intro-card .sibi{display:inline-block;margin-top:7px;padding:3px 9px;background:rgba(124,58,237,0.13);border:1px solid rgba(124,58,237,0.28);border-radius:20px;font-size:0.72rem;color:#a78bfa;}
+  .speaking-badge{display:none;align-items:center;gap:6px;padding:6px 14px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.28);border-radius:20px;color:var(--green);font-size:0.8rem;margin-top:12px;}
+  .speaking-badge.show{display:inline-flex;}
+  .speak-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse-dot 0.8s infinite;}
+
+  /* KAMUS */
+  .kamus-page{max-width:900px;margin:0 auto;padding:40px 24px;position:relative;z-index:1;}
+  .kamus-input{width:100%;padding:12px 18px;background:var(--surface);border:1.5px solid var(--card-border);border-radius:12px;color:var(--text);font-size:0.95rem;outline:none;font-family:'DM Sans',sans-serif;transition:border-color 0.2s;margin-bottom:22px;}
+  .kamus-input:focus{border-color:var(--accent);}
+  .kamus-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:12px;}
+  .kamus-item{background:var(--surface);border:1px solid var(--card-border);border-radius:14px;padding:14px 10px;text-align:center;cursor:pointer;transition:all 0.2s;}
+  .kamus-item:hover{border-color:var(--accent3);transform:scale(1.05);}
+  .kamus-sign{font-size:2.2rem;display:block;margin-bottom:7px;}
+  .kamus-word{font-family:'Syne',sans-serif;font-size:0.82rem;font-weight:700;}
+  .kamus-sibi{color:var(--accent3);font-size:0.72rem;margin-top:3px;}
+
+  .status-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(10,15,30,0.92);backdrop-filter:blur(12px);border-top:1px solid var(--card-border);padding:9px 24px;display:flex;align-items:center;gap:14px;z-index:50;font-size:0.8rem;}
+  .status-indicator{width:8px;height:8px;border-radius:50%;background:var(--green);}
+  .status-text{color:var(--muted);}
+  .status-text strong{color:var(--text);}
+  ::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--surface2);border-radius:2px;}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">Sibi<span>Talk</span></div>
+  <div class="nav-chips">
+    <button class="nav-chip active" onclick="showPage('home')">🏠 Beranda</button>
+    <button class="nav-chip" onclick="showPage('scan')">🤚 Scan Isyarat</button>
+    <button class="nav-chip" onclick="showPage('perkenalan')">👋 Perkenalkan Diri</button>
+    <button class="nav-chip" onclick="showPage('kamus')">📖 Kamus SIBI</button>
+  </div>
+</nav>
+
+<!-- HOME -->
+<div id="page-home" class="page active">
+  <div class="hero">
+    <div class="hero-badge">🤟 MediaPipe Hands — Real Detection</div>
+    <h1>Komunikasi Tanpa Batas<br>untuk <em>Tuna Rungu</em></h1>
+    <p>Deteksi 21 titik tangan secara nyata lewat MediaPipe Hands (Google), analisis pola jari, dan bacakan hasilnya dengan suara Bahasa Indonesia.</p>
+    <div class="hero-actions">
+      <button class="btn-primary" onclick="showPage('scan')">🤚 Mulai Scan Tangan</button>
+      <button class="btn-ghost" onclick="showPage('perkenalan')">👋 Perkenalkan Diri</button>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-title">Fitur Utama</div>
+    <div class="cards-grid">
+      <div class="card" onclick="showPage('scan')">
+        <div class="card-icon">🤚</div><h3>Deteksi Tangan Nyata</h3>
+        <p>MediaPipe mendeteksi 21 landmark tangan di tiap frame — bukan simulasi, tapi AI asli dari Google.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔊</div><h3>Alat Bantu Suara</h3>
+        <p>Setiap isyarat yang terdeteksi langsung diucapkan lewat Text-to-Speech Bahasa Indonesia.</p>
+      </div>
+      <div class="card" onclick="showPage('perkenalan')">
+        <div class="card-icon">👤</div><h3>Perkenalkan Diri</h3>
+        <p>Pilih isyarat, susun kalimat perkenalan, dan ucapkan semuanya sekaligus.</p>
+      </div>
+      <div class="card" onclick="showPage('kamus')">
+        <div class="card-icon">📖</div><h3>Kamus SIBI</h3>
+        <p>Referensi isyarat tangan SIBI lengkap — ketuk kartu untuk mendengar pengucapannya.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCAN PAGE -->
+<div id="page-scan" class="page">
+  <div style="max-width:920px;margin:0 auto;padding:28px 24px 4px;position:relative;z-index:1">
+    <div class="section-title">🤚 Scan Isyarat — MediaPipe Hands</div>
+    <p style="color:var(--muted);font-size:0.88rem;margin-top:-10px">Kamera nyata + AI tangan Google. Gerakkan jari — skeleton tangan muncul real-time.</p>
+  </div>
+  <div class="scan-container">
+    <div class="cam-box">
+      <div class="cam-header">
+        <div class="cam-dot red"></div><div class="cam-dot yellow"></div><div class="cam-dot green"></div>
+        <span class="cam-title">MediaPipe Hand Tracking</span>
+      </div>
+      <div class="video-wrap">
+        <video id="videoEl" autoplay playsinline muted></video>
+        <canvas id="handCanvas"></canvas>
+        <div class="scan-line" id="scanLine"></div>
+        <div class="scan-overlay" id="scanOverlay">
+          <div style="font-size:3rem">📷</div>
+          <p>Klik "Aktifkan Kamera"<br>untuk memulai deteksi nyata</p>
+        </div>
+        <div class="mp-loading" id="mpLoading">
+          <div class="spinner"></div>
+          <p>Memuat MediaPipe Hands…</p>
+        </div>
+        <div class="no-hand-notice" id="noHandNotice">👁 Tangan tidak terdeteksi</div>
+      </div>
+      <div class="conf-bar-wrap">
+        <div class="conf-label"><span>Keyakinan Deteksi</span><span id="confPct">0%</span></div>
+        <div class="conf-bar"><div class="conf-fill" id="confFill"></div></div>
+      </div>
+      <div class="cam-controls">
+        <button class="btn-scan" id="btnStart" onclick="startCamera()">📷 Aktifkan Kamera</button>
+        <button class="btn-stop" id="btnStop" onclick="stopCamera()" style="display:none">⏹ Stop</button>
+      </div>
+    </div>
+
+    <div class="result-panel">
+      <div class="result-header">
+        🎯 Hasil Deteksi
+        <div class="live-badge" id="liveBadge"><div class="live-dot"></div>LIVE</div>
+      </div>
+      <div class="gesture-display">
+        <div class="gesture-emoji" id="gestureEmoji">🤲</div>
+        <div class="gesture-label" id="gestureLabel">Menunggu…</div>
+        <div class="gesture-sub" id="gestureSub">Tunjukkan tangan ke kamera</div>
+        <div class="gesture-meaning" id="gestureMeaning" style="display:none"></div>
+        <!-- Bar indikator jari terangkat -->
+        <div class="finger-wrap" id="fingerWrap">
+          <div class="f-col"><div class="f-bar up" id="fb0" style="height:26px"></div><div class="f-name">👍</div></div>
+          <div class="f-col"><div class="f-bar" id="fb1" style="height:36px"></div><div class="f-name">☝️</div></div>
+          <div class="f-col"><div class="f-bar" id="fb2" style="height:40px"></div><div class="f-name">🖕</div></div>
+          <div class="f-col"><div class="f-bar" id="fb3" style="height:38px"></div><div class="f-name">💍</div></div>
+          <div class="f-col"><div class="f-bar" id="fb4" style="height:28px"></div><div class="f-name">🤙</div></div>
+        </div>
+      </div>
+      <button class="voice-btn" onclick="speakResult()">🔊 Ucapkan dengan Suara</button>
+      <div style="padding:0 18px 6px;font-size:0.76rem;color:var(--muted);font-family:'Syne',sans-serif;font-weight:700">RIWAYAT SESI</div>
+      <div class="history-list" id="historyList">
+        <div style="color:var(--muted);font-size:0.8rem;text-align:center;padding:14px 0">Belum ada deteksi</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PERKENALAN -->
+<div id="page-perkenalan" class="page">
+  <div class="intro-page">
+    <div class="section-title">👋 Perkenalkan Diri — Gaya Tuna Rungu</div>
+    <p style="color:var(--muted);font-size:0.88rem">Ketuk kartu isyarat untuk menyusun kalimat. Sistem membacakannya dengan suara.</p>
+    <div id="introBuilt" style="margin-top:18px;padding:14px 18px;background:var(--surface);border:1.5px solid var(--card-border);border-radius:14px;min-height:56px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <span style="color:var(--muted);font-size:0.84rem" id="introPlaceholder">Pilih isyarat di bawah untuk menyusun kalimat…</span>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;align-items:center">
+      <button class="btn-primary" onclick="speakIntro()" style="font-size:0.84rem;padding:10px 20px">🔊 Ucapkan Perkenalan</button>
+      <button class="btn-ghost" onclick="clearIntro()" style="font-size:0.84rem;padding:10px 20px">🗑 Hapus</button>
+      <div class="speaking-badge" id="speakingBadge"><div class="speak-dot"></div>Sedang berbicara…</div>
+    </div>
+    <div style="margin-top:26px"><div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:14px;color:var(--accent)">Sapaan & Nama</div>
+    <div class="intro-grid">
+      <div class="intro-card" onclick="addIntro('Halo!','👋')"><span class="intro-sign">👋</span><h3>Halo</h3><p>Sapaan awal</p><span class="sibi">H-A-L-O</span></div>
+      <div class="intro-card" onclick="addIntro('Nama saya','🙋')"><span class="intro-sign">🙋</span><h3>Nama Saya</h3><p>Memperkenalkan nama</p><span class="sibi">NAMA + SAYA</span></div>
+      <div class="intro-card" onclick="addIntro('Saya tuna rungu','🤟')"><span class="intro-sign">🤟</span><h3>Saya Tuna Rungu</h3><p>Identitas diri</p><span class="sibi">TULI + SAYA</span></div>
+      <div class="intro-card" onclick="addIntro('Senang bertemu kamu!','🤝')"><span class="intro-sign">🤝</span><h3>Senang Bertemu</h3><p>Ekspresi positif</p><span class="sibi">SENANG + KETEMU</span></div>
+    </div></div>
+    <div style="margin-top:22px"><div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:14px;color:var(--accent)">Informasi & Ekspresi</div>
+    <div class="intro-grid">
+      <div class="intro-card" onclick="addIntro('Hobi saya membaca','📚')"><span class="intro-sign">📚</span><h3>Hobi Membaca</h3><p>Minat literasi</p><span class="sibi">BACA + SUKA</span></div>
+      <div class="intro-card" onclick="addIntro('Saya bisa bahasa isyarat','🤙')"><span class="intro-sign">🤙</span><h3>Bisa Isyarat</h3><p>Kemampuan SIBI</p><span class="sibi">SIBI + BISA</span></div>
+      <div class="intro-card" onclick="addIntro('Terima kasih','🙏')"><span class="intro-sign">🙏</span><h3>Terima Kasih</h3><p>Ucapan syukur</p><span class="sibi">TERIMA + KASIH</span></div>
+      <div class="intro-card" onclick="addIntro('Sampai jumpa lagi!','👏')"><span class="intro-sign">👏</span><h3>Sampai Jumpa</h3><p>Salam perpisahan</p><span class="sibi">JUMPA + LAGI</span></div>
+      <div class="intro-card" onclick="addIntro('Tolong ulangi pelan-pelan','✋')"><span class="intro-sign">✋</span><h3>Ulangi Pelan</h3><p>Minta diulang</p><span class="sibi">ULANGI + PELAN</span></div>
+      <div class="intro-card" onclick="addIntro('Mari kita berteman!','💙')"><span class="intro-sign">💙</span><h3>Ajak Berteman</h3><p>Membangun koneksi</p><span class="sibi">TEMAN + YUK</span></div>
+    </div></div>
+  </div>
+</div>
+
+<!-- KAMUS -->
+<div id="page-kamus" class="page">
+  <div class="kamus-page">
+    <div class="section-title">📖 Kamus Isyarat SIBI</div>
+    <p style="color:var(--muted);font-size:0.88rem;margin-top:-10px;margin-bottom:18px">Ketuk kartu untuk mendengar pengucapan.</p>
+    <input class="kamus-input" placeholder="🔍 Cari kata isyarat…" oninput="filterKamus(this.value)">
+    <div class="kamus-grid" id="kamusGrid"></div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <div class="status-indicator" id="statusDot"></div>
+  <div class="status-text" id="statusText"><strong>SibiTalk</strong> — Siap digunakan</div>
+  <div style="margin-left:auto;color:var(--muted);font-size:0.75rem">MediaPipe Hands ♿</div>
+</div>
+
+<script>
+// ============================================================
+// DATA KAMUS
+// ============================================================
+const kamusData = [
+  {sign:'👋',word:'Halo',sibi:'H-A-L-O'},{sign:'🙋',word:'Nama Saya',sibi:'NAMA+SAYA'},
+  {sign:'🤟',word:'Aku Cinta Kamu',sibi:'AKU+CINTA+KAMU'},{sign:'🤝',word:'Bertemu',sibi:'KETEMU'},
+  {sign:'👍',word:'Bagus / Iya',sibi:'BAGUS'},{sign:'👎',word:'Tidak Bagus',sibi:'TIDAK'},
+  {sign:'🙏',word:'Terima Kasih',sibi:'TERIMA+KASIH'},{sign:'✋',word:'Berhenti',sibi:'STOP'},
+  {sign:'☝️',word:'Satu',sibi:'SATU'},{sign:'✌️',word:'Dua / Damai',sibi:'DUA'},
+  {sign:'🤞',word:'Semoga Berhasil',sibi:'SUKSES'},{sign:'🖐',word:'Lima',sibi:'LIMA'},
+  {sign:'💪',word:'Kuat / Semangat',sibi:'SEMANGAT'},{sign:'🤙',word:'Santai',sibi:'SANTAI'},
+  {sign:'👏',word:'Tepuk Tangan',sibi:'TEPUK'},{sign:'🤲',word:'Mohon',sibi:'MOHON'},
+  {sign:'👐',word:'Terbuka',sibi:'TERBUKA'},{sign:'🙌',word:'Gembira',sibi:'GEMBIRA'},
+  {sign:'🫶',word:'Sayang',sibi:'SAYANG'},{sign:'❤️',word:'Cinta',sibi:'CINTA'},
+  {sign:'🏠',word:'Rumah',sibi:'RUMAH'},{sign:'📚',word:'Belajar',sibi:'BELAJAR'},
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let currentGesture = null;
+let historyItems = [];
+let introSentences = [];
+let mpStream = null;
+let mpCameraObj = null;
+let handsModel = null;
+let lastSpeechTime = 0;
+let noHandTimer = null;
+let lastLabel = '';
+
+// ============================================================
+// NAVIGASI
+// ============================================================
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-chip').forEach(c => c.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  const map = {home:'beranda',scan:'scan',perkenalan:'perken',kamus:'kamus'};
+  document.querySelectorAll('.nav-chip').forEach(c => {
+    if (c.textContent.toLowerCase().includes(map[name])) c.classList.add('active');
+  });
+  if (name === 'kamus') renderKamus('');
+}
+
+// ============================================================
+// ✅ INISIALISASI KAMERA + MEDIAPIPE
+// ============================================================
+async function startCamera() {
+  const videoEl = document.getElementById('videoEl');
+  const loading = document.getElementById('mpLoading');
+  loading.classList.add('show');
+  setStatus('🟡', 'Memuat MediaPipe Hands dari CDN…');
+
+  try {
+    // Akses kamera pengguna
+    mpStream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 640, height: 480, facingMode: 'user' }
+    });
+    videoEl.srcObject = mpStream;
+    await new Promise(resolve => { videoEl.onloadedmetadata = resolve; });
+
+    // Sesuaikan canvas dengan resolusi video
+    const canvas = document.getElementById('handCanvas');
+    canvas.width  = videoEl.videoWidth  || 640;
+    canvas.height = videoEl.videoHeight || 480;
+
+    // ── Buat instance Hands (MediaPipe) ──────────────────────
+    handsModel = new Hands({
+      locateFile: (file) =>
+        `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+
+    handsModel.setOptions({
+      maxNumHands: 1,               // cukup 1 tangan
+      modelComplexity: 1,           // 0 = cepat, 1 = akurat
+      minDetectionConfidence: 0.70, // threshold deteksi awal
+      minTrackingConfidence: 0.60,  // threshold tracking antar frame
+    });
+
+    // Daftarkan callback — dipanggil tiap frame
+    handsModel.onResults(onHandResults);
+
+    // ── Camera helper (loop otomatis kirim frame ke model) ──
+    mpCameraObj = new Camera(videoEl, {
+      onFrame: async () => {
+        if (handsModel) await handsModel.send({ image: videoEl });
+      },
+      width: 640, height: 480,
+    });
+    await mpCameraObj.start();
+
+    // UI setelah berhasil
+    loading.classList.remove('show');
+    document.getElementById('scanOverlay').classList.add('hidden');
+    document.getElementById('btnStart').style.display = 'none';
+    document.getElementById('btnStop').style.display = '';
+    document.getElementById('scanLine').classList.add('active');
+    document.getElementById('liveBadge').classList.add('show');
+    setStatus('🟢', 'MediaPipe Hands aktif — deteksi real-time berjalan');
+
+  } catch (err) {
+    loading.classList.remove('show');
+    alert(
+      'Gagal memulai kamera atau MediaPipe.\n\n' +
+      'Pastikan:\n' +
+      '• Izin kamera diberikan di browser\n' +
+      '• Koneksi internet aktif (CDN MediaPipe perlu diunduh)\n' +
+      '• Gunakan Chrome/Edge terbaru\n\n' +
+      'Error: ' + err.message
+    );
+    setStatus('⚪', 'Gagal — cek izin kamera & internet');
+  }
+}
+
+function stopCamera() {
+  if (mpCameraObj)  { mpCameraObj.stop();  mpCameraObj = null; }
+  if (handsModel)   { handsModel.close();  handsModel = null; }
+  if (mpStream)     { mpStream.getTracks().forEach(t => t.stop()); mpStream = null; }
+  const canvas = document.getElementById('handCanvas');
+  canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+  document.getElementById('videoEl').srcObject = null;
+  document.getElementById('scanOverlay').classList.remove('hidden');
+  document.getElementById('btnStart').style.display = '';
+  document.getElementById('btnStop').style.display = 'none';
+  document.getElementById('scanLine').classList.remove('active');
+  document.getElementById('liveBadge').classList.remove('show');
+  document.getElementById('noHandNotice').classList.remove('show');
+  setConfidence(0);
+  updateFingerBars([false,false,false,false,false]);
+  lastLabel = '';
+  setStatus('⚪', 'Kamera dimatikan');
+}
+
+// ============================================================
+// ✅ CALLBACK MEDIAPIPE — dipanggil tiap frame
+// ============================================================
+function onHandResults(results) {
+  const canvas = document.getElementById('handCanvas');
+  const ctx    = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Tidak ada tangan terdeteksi
+  if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+    setConfidence(0);
+    updateFingerBars([false,false,false,false,false]);
+    clearTimeout(noHandTimer);
+    noHandTimer = setTimeout(() => {
+      document.getElementById('noHandNotice').classList.add('show');
+    }, 1800);
+    return;
+  }
+
+  // Tangan ditemukan → sembunyikan notis
+  clearTimeout(noHandTimer);
+  document.getElementById('noHandNotice').classList.remove('show');
+
+  // Ambil landmark tangan pertama (21 titik)
+  const landmarks  = results.multiHandLandmarks[0];
+  const confidence = results.multiHandedness?.[0]?.score ?? 0.85;
+
+  // 1. Gambar skeleton di canvas
+  drawRealSkeleton(ctx, landmarks, canvas.width, canvas.height);
+
+  // 2. Update confidence bar
+  setConfidence(Math.round(confidence * 100));
+
+  // 3. Analisis posisi jari
+  const fingerStates = getFingerStates(landmarks);
+  updateFingerBars(fingerStates);
+
+  // 4. Klasifikasi isyarat
+  const gesture = classifyGesture(fingerStates, landmarks);
+  if (gesture) triggerGesture(gesture);
+}
+
+// ============================================================
+// ✅ GAMBAR SKELETON TANGAN NYATA (21 landmark MediaPipe)
+// ============================================================
+const CONNECTIONS = [
+  [0,1],[1,2],[2,3],[3,4],           // jempol
+  [0,5],[5,6],[6,7],[7,8],           // telunjuk
+  [0,9],[9,10],[10,11],[11,12],      // jari tengah
+  [0,13],[13,14],[14,15],[15,16],    // jari manis
+  [0,17],[17,18],[18,19],[19,20],    // kelingking
+  [5,9],[9,13],[13,17],              // palm connector
+];
+
+function drawRealSkeleton(ctx, lm, W, H) {
+  // Garis koneksi tulang
+  CONNECTIONS.forEach(([a, b]) => {
+    ctx.beginPath();
+    ctx.moveTo(lm[a].x * W, lm[a].y * H);
+    ctx.lineTo(lm[b].x * W, lm[b].y * H);
+    ctx.strokeStyle = 'rgba(0,229,255,0.6)';
+    ctx.lineWidth   = 2;
+    ctx.stroke();
+  });
+
+  // Titik landmark
+  lm.forEach((p, i) => {
+    const x = p.x * W, y = p.y * H;
+    const isTip     = [4, 8, 12, 16, 20].includes(i);
+    const isWrist   = i === 0;
+    const isKnuckle = [5,9,13,17].includes(i);
+
+    ctx.beginPath();
+    ctx.arc(x, y, isWrist ? 7 : isTip ? 5 : 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = isWrist   ? '#f59e0b'  // pergelangan = emas
+                  : isTip     ? '#00e5ff'  // ujung jari   = cyan
+                  : isKnuckle ? '#7c3aed'  // buku jari    = ungu
+                  : 'rgba(255,255,255,0.5)';
+    ctx.fill();
+  });
+
+  // Label di bawah pergelangan
+  ctx.fillStyle = 'rgba(0,229,255,0.85)';
+  ctx.font = `bold ${Math.round(H * 0.028)}px sans-serif`;
+  ctx.fillText('✋ Tangan terdeteksi', lm[0].x * W - 60, lm[0].y * H + 22);
+}
+
+// ============================================================
+// ✅ DETEKSI STATUS JARI (terangkat / ditekuk)
+// ============================================================
+function getFingerStates(lm) {
+  // Jempol: bandingkan x tip vs MCP (horizontal)
+  const thumbUp = lm[4].x < lm[3].x; // mirror karena selfie-cam
+
+  // 4 jari: tip.y < pip.y  →  jari berdiri
+  const otherFingers = [
+    lm[8].y  < lm[6].y,   // telunjuk
+    lm[12].y < lm[10].y,  // jari tengah
+    lm[16].y < lm[14].y,  // jari manis
+    lm[20].y < lm[18].y,  // kelingking
+  ];
+
+  return [thumbUp, ...otherFingers];
+  // index: 0=jempol, 1=telunjuk, 2=tengah, 3=manis, 4=kelingking
+}
+
+// ============================================================
+// ✅ KLASIFIKASI ISYARAT dari pola jari
+// ============================================================
+function classifyGesture(f, lm) {
+  const [T, I, M, R, P] = f; // Thumb, Index, Middle, Ring, Pinky
+  const upCount = f.filter(Boolean).length;
+
+  // ── Pola spesifik ──────────────────────────────────────────
+  if (!T && !I && !M && !R && !P)
+    return g('✊','KEPALAN','Semua jari terkepal','Kepalan tangan');
+
+  if (T && I && !M && !R && P)
+    return g('🤟','AKU CINTA KAMU','Jempol + telunjuk + kelingking','Aku cinta kamu');
+
+  if (T && !I && !M && !R && P)
+    return g('🤙','HALO / TELEPON','Jempol dan kelingking terangkat','Halo!');
+
+  if (!T && I && !M && !R && !P)
+    return g('☝️','SATU','Hanya telunjuk berdiri','Satu');
+
+  if (!T && I && M && !R && !P)
+    return g('✌️','DUA / DAMAI','Telunjuk dan jari tengah','Damai');
+
+  if (!T && I && M && R && !P)
+    return g('🤟','TIGA','Tiga jari terangkat','Tiga');
+
+  if (!T && I && M && R && P)
+    return g('🖐','EMPAT','Empat jari terangkat','Empat');
+
+  if (T && I && M && R && P)
+    return g('🖐','LIMA / HALO','Semua jari terbuka','Lima, halo semua!');
+
+  if (T && !I && !M && !R && !P)
+    return g('👍','BAGUS','Hanya jempol naik','Bagus sekali!');
+
+  if (!T && !I && !M && !R && P)
+    return g('🤙','KELINGKING','Hanya kelingking berdiri','Kelingking');
+
+  if (!T && !I && M && !R && !P)
+    return g('🖕','JARI TENGAH','Hanya jari tengah berdiri','Jari tengah');
+
+  // OK sign: jempol + telunjuk dekat, jari lain berdiri
+  if (T && I && M && !R && !P) {
+    const d = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
+    if (d < 0.07) return g('👌','OKE','Jempol-telunjuk membentuk lingkaran','Oke, setuju!');
+    return g('🤞','HARAPAN','Tiga jari depan terangkat','Semoga berhasil!');
+  }
+
+  if (!T && !I && !M && R && P)
+    return g('🤘','ROCK','Jari manis + kelingking','Rock!');
+
+  return null; // pola belum dikenali
+}
+
+function g(emoji, label, meaning, speech) {
+  return { emoji, label, meaning, speech };
+}
+
+// ============================================================
+// TAMPILKAN HASIL GESTUR
+// ============================================================
+function triggerGesture(gesture) {
+  if (gesture.label === lastLabel) return; // hindari update spam
+  lastLabel = gesture.label;
+  currentGesture = gesture;
+
+  document.getElementById('gestureEmoji').textContent  = gesture.emoji;
+  document.getElementById('gestureLabel').textContent  = gesture.label;
+  document.getElementById('gestureSub').textContent    = gesture.meaning;
+  const m = document.getElementById('gestureMeaning');
+  m.textContent  = '"' + gesture.speech + '"';
+  m.style.display = 'block';
+
+  // Tambah ke riwayat
+  const t = new Date();
+  const time = t.getHours().toString().padStart(2,'0') + ':' + t.getMinutes().toString().padStart(2,'0');
+  historyItems.unshift({ ...gesture, time });
+  if (historyItems.length > 8) historyItems.pop();
+  renderHistory();
+
+  // Auto-speak (debounce 2.5 detik)
+  const now = Date.now();
+  if (now - lastSpeechTime > 2500) {
+    lastSpeechTime = now;
+    speakText(gesture.speech);
+  }
+
+  setStatus('🟡', 'Terdeteksi: ' + gesture.label);
+}
+
+function setConfidence(pct) {
+  document.getElementById('confFill').style.width = pct + '%';
+  document.getElementById('confPct').textContent  = pct + '%';
+}
+
+function updateFingerBars(states) {
+  const ids  = ['fb0','fb1','fb2','fb3','fb4'];
+  const heights = [26,36,40,38,28];
+  states.forEach((up, i) => {
+    const el = document.getElementById(ids[i]);
+    el.style.height = heights[i] + 'px';
+    el.className = 'f-bar' + (up ? ' up' : '');
+  });
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  if (!historyItems.length) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;text-align:center;padding:14px 0">Belum ada deteksi</div>';
+    return;
+  }
+  list.innerHTML = historyItems.map(h => `
+    <div class="history-item">
+      <span>${h.emoji}</span>
+      <span class="h-label">${h.label}</span>
+      <span class="h-time">${h.time}</span>
+    </div>`).join('');
+}
+
+function speakResult() {
+  if (!currentGesture) { speakText('Belum ada isyarat yang terdeteksi'); return; }
+  speakText(currentGesture.speech);
+}
+
+// ============================================================
+// PERKENALAN
+// ============================================================
+function addIntro(text, emoji) { introSentences.push({text,emoji}); renderIntroBuilt(); }
+function clearIntro() { introSentences = []; renderIntroBuilt(); }
+function renderIntroBuilt() {
+  const box = document.getElementById('introBuilt');
+  if (!introSentences.length) {
+    box.innerHTML = '<span style="color:var(--muted);font-size:0.84rem">Pilih isyarat di bawah untuk menyusun kalimat…</span>';
+    return;
+  }
+  box.innerHTML = introSentences.map((s,i) => `
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(0,229,255,0.07);border:1px solid rgba(0,229,255,0.18);border-radius:8px;font-size:0.84rem;cursor:pointer" onclick="removeIntro(${i})">
+      ${s.emoji} ${s.text} <span style="color:var(--muted);font-size:0.7rem">✕</span>
+    </span>`).join('');
+}
+function removeIntro(i) { introSentences.splice(i,1); renderIntroBuilt(); }
+function speakIntro() {
+  if (!introSentences.length) { speakText('Belum ada isyarat yang dipilih'); return; }
+  const text = introSentences.map(s => s.text).join('. ');
+  const badge = document.getElementById('speakingBadge');
+  badge.classList.add('show');
+  speakText(text, () => badge.classList.remove('show'));
+}
+
+// ============================================================
+// KAMUS
+// ============================================================
+function renderKamus(filter) {
+  const grid = document.getElementById('kamusGrid');
+  if (!grid) return;
+  const f = filter.toLowerCase();
+  const list = kamusData.filter(k => !f || k.word.toLowerCase().includes(f));
+  grid.innerHTML = list.map(k => `
+    <div class="kamus-item" onclick="speakText('${k.word}')">
+      <span class="kamus-sign">${k.sign}</span>
+      <div class="kamus-word">${k.word}</div>
+      <div class="kamus-sibi">${k.sibi}</div>
+    </div>`).join('') ||
+    '<div style="color:var(--muted);padding:20px;grid-column:1/-1;text-align:center">Tidak ditemukan</div>';
+}
+function filterKamus(val) { renderKamus(val); }
+
+// ============================================================
+// TEXT TO SPEECH
+// ============================================================
+function speakText(text, onEnd) {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const utter    = new SpeechSynthesisUtterance(text);
+  utter.lang     = 'id-ID';
+  utter.rate     = 0.88;
+  utter.pitch    = 1;
+  utter.volume   = 1;
+  if (onEnd) utter.onend = onEnd;
+  const voices   = window.speechSynthesis.getVoices();
+  const idVoice  = voices.find(v => v.lang.startsWith('id'));
+  if (idVoice) utter.voice = idVoice;
+  window.speechSynthesis.speak(utter);
+  setStatus('🔊', 'Berbicara: "' + text.substring(0,44) + (text.length > 44 ? '…' : '"'));
+}
+
+// ============================================================
+// STATUS BAR
+// ============================================================
+function setStatus(icon, text) {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  dot.style.background = icon==='🟢'?'var(--green)':icon==='🟡'?'var(--accent3)':icon==='🔊'?'var(--accent2)':'var(--muted)';
+  txt.innerHTML = `<strong>SibiTalk</strong> — ${text}`;
+}
+
+window.speechSynthesis?.getVoices?.();
+</script>
+</body>
+</html>
